@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Emoji a Pantalla Completa</title>
+  <style>
+    :root {
+      --bg: #0b0b0c;
+      --fg: #ffffff;
+      --panel: #16171a;
+      --panel-border: #2a2c31;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    }
+    .app {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      height: 100%;
+    }
+    #display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+    }
+    #emoji {
+      line-height: 1;
+      font-size: clamp(48px, var(--size, 70vh), 90vh);
+      filter: drop-shadow(0 12px 24px rgba(0,0,0,.35));
+      transition: transform .15s ease-out;
+    }
+    #emoji:active { transform: scale(.98); }
+
+    .panel {
+      background: var(--panel);
+      border-top: 1px solid var(--panel-border);
+      padding: 10px env(safe-area-inset-right) 12px env(safe-area-inset-left);
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .row + .row { margin-top: 10px; }
+
+    button, input[type="text"], select {
+      background: #1f2126;
+      color: var(--fg);
+      border: 1px solid #2a2c31;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 16px;
+    }
+    button { cursor: pointer; }
+    button:active { transform: translateY(1px); }
+
+    .grow { flex: 1 1 auto; }
+
+    .pill {
+      padding: 8px 12px; border-radius: 999px; font-size: 14px; opacity: .9;
+    }
+
+    .grid {
+      display: grid;
+      gap: 6px;
+      grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+      max-height: 28vh;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid #2a2c31;
+      border-radius: 14px;
+      padding: 6px;
+      background: #121317;
+    }
+    .tile {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      font-size: 28px;
+      background: #191b20;
+      border: 1px solid #2a2c31;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+    .tile:active { background: #20232a; }
+
+    .hidden { display: none !important; }
+    .right { margin-left: auto; }
+
+    .range {
+      appearance: none;
+      width: 160px;
+      height: 6px;
+      border-radius: 999px;
+      background: #2a2c31;
+      outline: none;
+    }
+    .range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px; height: 22px; border-radius: 50%; background: #e1e1e6; border: none; box-shadow: 0 2px 10px rgba(0,0,0,.3);
+    }
+
+    .note { font-size: 12px; opacity: .75; }
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #20232a; border: 1px solid #2a2c31; border-radius: 6px; padding: 2px 6px; font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div id="display" title="Toca para mostrar/ocultar controles">
+      <div id="emoji" role="img" aria-label="emoji">🙂</div>
+    </div>
+
+    <div id="controls" class="panel">
+      <div class="row">
+        <input id="search" class="grow" type="text" inputmode="text" placeholder="Buscar carita (ej: feliz, triste, sorpresa) o pega un emoji…" aria-label="Buscar emoji" />
+        <button id="random" title="Carita aleatoria">🎲</button>
+        <button id="clear" title="Limpiar">🧼</button>
+        <button id="toggleTheme" title="Claro/Oscuro">🌓</button>
+        <label class="pill" title="Tamaño">Tamaño <input id="size" class="range" type="range" min="40" max="95" value="70" /></label>
+        <button id="present" class="right" title="Ocultar controles (modo presentación)">🎬 Presentar</button>
+      </div>
+      <div class="row">
+        <div id="grid" class="grid" aria-label="Lista de emojis de caritas"></div>
+      </div>
+      <div class="row note">
+        Consejo: toca el emoji grande para ocultar/mostrar controles. Doble toque para restaurar.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Caritas (solo categoría de caras y emociones)
+    const FACE_EMOJIS = [
+      "😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","🙂","🙃","🥲","😋","😌","😍","🥰","😘","😗","😙","😚","😜","🤪","😝","🤑","🤗","🤭","🫢","🫣","🤫","🤔","🫠","🤐","🤨","😐","🫤","😑","😶","🫥","😏","😒","🙄","😬","😮‍💨","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤧","🥵","🥶","🥴","😵","😵‍💫","🤯","🤠","🥳","😎","🤓","🧐","😕","🫤","😟","🙁","☹️","😮","😯","😲","😳","🥺","😦","😧","😨","😰","😥","😢","😭","😱","😖","😣","😞","😓","😩","😫","😤","😡","😠","🤬","🤢","🤮","🤧","😷","🤯","😇","🥹","🫨"
+    ];
+
+    // Diccionario simple para búsqueda en español
+    const TAGS = {
+      "feliz": ["😀","😃","😄","😊","🙂","😁","😆","🥳"],
+      "risa": ["😂","🤣","😹"],
+      "amor": ["😍","🥰","😘","😚"],
+      "beso": ["😘","😗","😙","😚"],
+      "guiño": ["😉"],
+      "sorpresa": ["😮","😯","😲","😳","🫨"],
+      "cool": ["😎"],
+      "pensando": ["🤔"],
+      "triste": ["🙁","☹️","😞","😢","😭"],
+      "enojo": ["😠","😡","🤬"],
+      "miedo": ["😨","😰","😱"],
+      "cansado": ["😪","😴","😩","😫"],
+      "enfermo": ["🤒","🤕","🤧","😷"],
+      "frio": ["🥶"],
+      "calor": ["🥵"],
+      "mareo": ["😵","😵‍💫"],
+      "vergüenza": ["😳","🥺"],
+      "asco": ["🤢","🤮"],
+      "fiesta": ["🥳"],
+      "santo": ["😇"],
+      "picaro": ["😏"],
+      "callado": ["🤫","🤐"],
+    };
+
+    const $ = sel => document.querySelector(sel);
+    const display = $('#display');
+    const emoji = $('#emoji');
+    const grid = $('#grid');
+    const search = $('#search');
+    const size = $('#size');
+    const randomBtn = $('#random');
+    const clearBtn = $('#clear');
+    const presentBtn = $('#present');
+    const toggleThemeBtn = $('#toggleTheme');
+    const controls = $('#controls');
+
+    // Render grid
+    function renderGrid(list = FACE_EMOJIS) {
+      grid.innerHTML = '';
+      list.forEach(e => {
+        const el = document.createElement('button');
+        el.className = 'tile';
+        el.textContent = e;
+        el.title = 'Mostrar ' + e;
+        el.addEventListener('click', () => setEmoji(e));
+        grid.appendChild(el);
+      });
+    }
+
+    function setEmoji(e) {
+      if (!e) return;
+      emoji.textContent = e;
+      // Announce for a11y
+      emoji.setAttribute('aria-label', 'emoji ' + e);
+    }
+
+    function setSize(v) {
+      document.documentElement.style.setProperty('--size', v + 'vh');
+    }
+
+    // Search logic (by tag or direct emoji)
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      if (!q) { renderGrid(); return; }
+      // If user pasted an emoji, just show it
+      if (/\p{Extended_Pictographic}/u.test(q)) {
+        setEmoji(q);
+        return;
+      }
+      // Match tags or filter by name approximation
+      let set = new Set();
+      Object.entries(TAGS).forEach(([k, arr]) => {
+        if (k.includes(q)) arr.forEach(e => set.add(e));
+      });
+      if (set.size === 0) {
+        // Fallback: fuzzy includes by similar Spanish words
+        const hints = [
+          ['feliz','😀','😃','😄','😊'],
+          ['risa','😂','🤣'],
+          ['triste','😢','😭'],
+          ['enojo','😠','😡','🤬'],
+          ['sorpresa','😮','😲','🫨'],
+          ['miedo','😨','😱'],
+          ['amor','😍','🥰'],
+        ];
+        hints.forEach(([word, ...arr]) => { if (word.includes(q) || q.includes(word)) arr.forEach(e => set.add(e)); });
+      }
+      renderGrid(set.size ? Array.from(set) : FACE_EMOJIS);
+    });
+
+    // Buttons
+    randomBtn.addEventListener('click', () => {
+      const e = FACE_EMOJIS[Math.floor(Math.random() * FACE_EMOJIS.length)];
+      setEmoji(e);
+    });
+
+    clearBtn.addEventListener('click', () => setEmoji(''));
+
+    size.addEventListener('input', () => setSize(size.value));
+
+    // Presentation mode: hide controls
+    let hidden = false;
+    function toggleControls(force) {
+      hidden = typeof force === 'boolean' ? force : !hidden;
+      controls.classList.toggle('hidden', hidden);
+    }
+
+    presentBtn.addEventListener('click', () => toggleControls(true));
+    display.addEventListener('click', () => toggleControls());
+
+    // Double-tap to restore controls
+    let lastTap = 0;
+    display.addEventListener('touchend', () => {
+      const now = Date.now();
+      if (now - lastTap < 300) toggleControls(false);
+      lastTap = now;
+    });
+
+    // Theme toggle (light/dark)
+    let dark = true;
+    function applyTheme() {
+      if (dark) {
+        document.documentElement.style.setProperty('--bg', '#0b0b0c');
+        document.documentElement.style.setProperty('--fg', '#ffffff');
+        document.documentElement.style.setProperty('--panel', '#16171a');
+        document.documentElement.style.setProperty('--panel-border', '#2a2c31');
+      } else {
+        document.documentElement.style.setProperty('--bg', '#f6f7fb');
+        document.documentElement.style.setProperty('--fg', '#111217');
+        document.documentElement.style.setProperty('--panel', '#ffffff');
+        document.documentElement.style.setProperty('--panel-border', '#e7e8ee');
+      }
+    }
+    toggleThemeBtn.addEventListener('click', () => { dark = !dark; applyTheme(); });
+
+    // Init
+    renderGrid();
+    setSize(size.value);
+    applyTheme();
+
+    // Allow quick paste of emoji into the big area
+    document.addEventListener('paste', (e) => {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if (text && /\p{Extended_Pictographic}/u.test(text)) {
+        setEmoji(text.trim());
+      }
+    });
+  </script>
+</body>
+</html>
